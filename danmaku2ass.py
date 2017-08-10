@@ -1,6 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
-# The original author of this program, Danmaku2ASS, is StarBrilliant.
+# This program is a folk of https://github.com/m13253/danmaku2ass, re-written in
+# python2 so that it can be imported by python2 scripts.
+
 # This file is released under General Public License version 3.
 # You should have received a copy of General Public License text alongside with
 # this program. If not, you can obtain it at http://gnu.org/copyleft/gpl.html .
@@ -8,13 +10,12 @@
 # any damage or problems caused by this program.
 
 # You can obtain a latest copy of Danmaku2ASS at:
-#   https://github.com/m13253/danmaku2ass
+#   https://github.com/coslyk/danmaku2ass
 # Please update to the latest version before complaining.
 
 import argparse
 import calendar
 import gettext
-import io
 import json
 import logging
 import math
@@ -24,10 +25,14 @@ import re
 import sys
 import time
 import xml.dom.minidom
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from StringIO import StringIO
 
-
-if sys.version_info < (3,):
-    raise RuntimeError('at least Python 3.0 is required')
+if sys.getdefaultencoding() != 'utf-8':
+    reload(sys)
+    sys.setdefaultencoding('utf-8')
 
 gettext.install('danmaku2ass', os.path.join(os.path.dirname(os.path.abspath(os.path.realpath(sys.argv[0] or 'locale'))), 'locale'))
 
@@ -515,7 +520,7 @@ def ConvertFlashRotation(rotY, rotZ, X, Y, width, height):
 def ProcessComments(comments, f, width, height, bottomReserved, fontface, fontsize, alpha, duration_marquee, duration_still, filter_regex, reduced, progress_callback):
     styleid = 'Danmaku2ASS_%04x' % random.randint(0, 0xffff)
     WriteASSHead(f, width, height, fontface, fontsize, alpha, styleid)
-    rows = [[None] * (height - bottomReserved + 1) for i in range(4)]
+    rows = [[None] * (height - bottomReserved + 1) for i in xrange(4)]
     for idx, i in enumerate(comments):
         if progress_callback and idx % 1000 == 0:
             progress_callback(idx, len(comments))
@@ -579,7 +584,7 @@ def TestFreeRows(rows, c, row, width, height, bottomReserved, duration_marquee, 
 
 def FindAlternativeRow(rows, c, height, bottomReserved):
     res = 0
-    for row in range(height - bottomReserved - math.ceil(c[7])):
+    for row in xrange(height - bottomReserved - int(math.ceil(c[7]))):
         if not rows[c[4]][row]:
             return row
         elif rows[c[4]][row][0] < rows[c[4]][res][0]:
@@ -589,7 +594,7 @@ def FindAlternativeRow(rows, c, height, bottomReserved):
 
 def MarkCommentRow(rows, c, row):
     try:
-        for i in range(row, row + math.ceil(c[7])):
+        for i in xrange(row, row + int(math.ceil(c[7]))):
             rows[c[4]][i] = c
     except IndexError:
         pass
@@ -630,10 +635,10 @@ def WriteComment(f, c, row, width, height, bottomReserved, fontsize, duration_ma
         styles.append('\\an2\\pos(%(halfwidth)d, %(row)d)' % {'halfwidth': width / 2, 'row': ConvertType2(row, height, bottomReserved)})
         duration = duration_still
     elif c[4] == 3:
-        styles.append('\\move(%(neglen)d, %(row)d, %(width)d, %(row)d)' % {'width': width, 'row': row, 'neglen': -math.ceil(c[8])})
+        styles.append('\\move(%(neglen)d, %(row)d, %(width)d, %(row)d)' % {'width': width, 'row': row, 'neglen': int(-math.ceil(c[8]))})
         duration = duration_marquee
     else:
-        styles.append('\\move(%(width)d, %(row)d, %(neglen)d, %(row)d)' % {'width': width, 'row': row, 'neglen': -math.ceil(c[8])})
+        styles.append('\\move(%(width)d, %(row)d, %(neglen)d, %(row)d)' % {'width': width, 'row': row, 'neglen': int(-math.ceil(c[8]))})
         duration = duration_marquee
     if not (-1 < c[6] - fontsize < 1):
         styles.append('\\fs%.0f' % c[6])
@@ -692,11 +697,9 @@ def ConvertType2(row, height, bottomReserved):
     return height - bottomReserved - row
 
 
-def ConvertToFile(filename_or_file, *args, **kwargs):
-    if isinstance(filename_or_file, bytes):
-        filename_or_file = str(bytes(filename_or_file).decode('utf-8', 'replace'))
+def ConvertToFile(filename_or_file, options):
     if isinstance(filename_or_file, str):
-        return open(filename_or_file, *args, **kwargs)
+        return open(filename_or_file, options)
     else:
         return filename_or_file
 
@@ -704,7 +707,7 @@ def ConvertToFile(filename_or_file, *args, **kwargs):
 def FilterBadChars(f):
     s = f.read()
     s = re.sub('[\\x00-\\x08\\x0b\\x0c\\x0e-\\x1f]', '\ufffd', s)
-    return io.StringIO(s)
+    return StringIO(s)
 
 
 class safe_list(list):
@@ -738,7 +741,7 @@ def Danmaku2ASS(input_files, input_format, output_file, stage_width, stage_heigh
     comments = ReadComments(input_files, input_format, font_size)
     try:
         if output_file:
-            fo = ConvertToFile(output_file, 'w', encoding='utf-8-sig', errors='replace', newline='\r\n')
+            fo = ConvertToFile(output_file, 'w')
         else:
             fo = sys.stdout
         ProcessComments(comments, fo, stage_width, stage_height, reserve_blank, font_face, font_size, text_opacity, duration_marquee, duration_still, filter_regex, is_reduce_comments, progress_callback)
@@ -749,8 +752,6 @@ def Danmaku2ASS(input_files, input_format, output_file, stage_width, stage_heigh
 
 @export
 def ReadComments(input_files, input_format, font_size=25.0, progress_callback=None):
-    if isinstance(input_files, bytes):
-        input_files = str(bytes(input_files).decode('utf-8', 'replace'))
     if isinstance(input_files, str):
         input_files = [input_files]
     else:
@@ -759,9 +760,9 @@ def ReadComments(input_files, input_format, font_size=25.0, progress_callback=No
     for idx, i in enumerate(input_files):
         if progress_callback:
             progress_callback(idx, len(input_files))
-        with ConvertToFile(i, 'r', encoding='utf-8', errors='replace') as f:
+        with ConvertToFile(i, 'r') as f:
             s = f.read()
-            str_io = io.StringIO(s)
+            str_io = StringIO(s)
             if input_format == 'autodetect':
                 CommentProcessor = GetCommentProcessor(str_io)
                 if not CommentProcessor:
