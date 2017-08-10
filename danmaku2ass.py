@@ -697,11 +697,14 @@ def ConvertType2(row, height, bottomReserved):
     return height - bottomReserved - row
 
 
-def ConvertToFile(filename_or_file, options):
-    if isinstance(filename_or_file, str):
-        return open(filename_or_file, options)
+def ConvertToFile(str_or_file, options):
+    if isinstance(str_or_file, str):
+        if str_or_file[0] in ('[', '{', '<'):
+            return StringIO(str_or_file)
+        else:
+            return open(str_or_file, options)
     else:
-        return filename_or_file
+        return str_or_file
 
 
 def FilterBadChars(f):
