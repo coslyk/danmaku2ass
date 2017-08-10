@@ -1,5 +1,9 @@
-Danmaku2ASS
+Danmaku2ASS (Python2 version)
 ===========
+
+This program is a folk of [m13253's Danmaku2ass](https://github.com/m13253/danmaku2ass), re-written in
+python2 so that it can be imported by python2 scripts.
+
 
 What is it?
 -----------
