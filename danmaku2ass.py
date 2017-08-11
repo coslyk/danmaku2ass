@@ -30,11 +30,15 @@ try:
 except ImportError:
     from StringIO import StringIO
 
+# set utf-8 as default encoding
 if sys.getdefaultencoding() != 'utf-8':
     reload(sys)
     sys.setdefaultencoding('utf-8')
 
-gettext.install('danmaku2ass', os.path.join(os.path.dirname(os.path.abspath(os.path.realpath(sys.argv[0] or 'locale'))), 'locale'))
+try:
+    gettext.install('danmaku2ass', os.path.join(os.path.dirname(os.path.abspath(os.path.realpath(sys.argv[0] or 'locale'))), 'locale'))
+except AttributeError: # in some case sys.argv does not exist
+    gettext.install('danmaku2ass', os.path.join(os.path.dirname(os.path.abspath(os.path.realpath('locale'))), 'locale'))
 
 
 def SeekZero(function):
@@ -458,16 +462,16 @@ def GetZoomFactor(SourceSize, TargetSize):
         pass
     GetZoomFactor.Cached_Size = (SourceSize, TargetSize)
     try:
-        SourceAspect = SourceSize[0] / SourceSize[1]
-        TargetAspect = TargetSize[0] / TargetSize[1]
+        SourceAspect = float(SourceSize[0]) / SourceSize[1]
+        TargetAspect = float(TargetSize[0]) / TargetSize[1]
         if TargetAspect < SourceAspect:  # narrower
-            ScaleFactor = TargetSize[0] / SourceSize[0]
+            ScaleFactor = float(TargetSize[0]) / SourceSize[0]
             GetZoomFactor.Cached_Result = (ScaleFactor, 0, (TargetSize[1] - TargetSize[0] / SourceAspect) / 2)
         elif TargetAspect > SourceAspect:  # wider
-            ScaleFactor = TargetSize[1] / SourceSize[1]
+            ScaleFactor = float(TargetSize[1]) / SourceSize[1]
             GetZoomFactor.Cached_Result = (ScaleFactor, (TargetSize[0] - TargetSize[1] * SourceAspect) / 2, 0)
         else:
-            GetZoomFactor.Cached_Result = (TargetSize[0] / SourceSize[0], 0, 0)
+            GetZoomFactor.Cached_Result = (float(TargetSize[0]) / SourceSize[0], 0, 0)
         return GetZoomFactor.Cached_Result
     except ZeroDivisionError:
         GetZoomFactor.Cached_Result = (1, 0, 0)
@@ -763,22 +767,22 @@ def ReadComments(input_files, input_format, font_size=25.0, progress_callback=No
     for idx, i in enumerate(input_files):
         if progress_callback:
             progress_callback(idx, len(input_files))
-        with ConvertToFile(i, 'r') as f:
-            s = f.read()
-            str_io = StringIO(s)
-            if input_format == 'autodetect':
-                CommentProcessor = GetCommentProcessor(str_io)
-                if not CommentProcessor:
-                    raise ValueError(
-                        _('Failed to detect comment file format: %s') % i
-                    )
-            else:
-                CommentProcessor = CommentFormatMap.get(input_format)
-                if not CommentProcessor:
-                    raise ValueError(
-                        _('Unknown comment file format: %s') % input_format
-                    )
-            comments.extend(CommentProcessor(FilterBadChars(str_io), font_size))
+        f = ConvertToFile(i, 'r')
+        s = f.read()
+        str_io = StringIO(s)
+        if input_format == 'autodetect':
+            CommentProcessor = GetCommentProcessor(str_io)
+            if not CommentProcessor:
+                raise ValueError(
+                    _('Failed to detect comment file format: %s') % i
+                )
+        else:
+            CommentProcessor = CommentFormatMap.get(input_format)
+            if not CommentProcessor:
+                raise ValueError(
+                    _('Unknown comment file format: %s') % input_format
+                )
+        comments.extend(CommentProcessor(FilterBadChars(str_io), font_size))
     if progress_callback:
         progress_callback(len(input_files), len(input_files))
     comments.sort()
